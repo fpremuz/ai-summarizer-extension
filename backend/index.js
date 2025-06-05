@@ -1,15 +1,22 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; 
 import dotenv from "dotenv";
-
 dotenv.config({ path: './backend/.env' });
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+function cleanText(rawText) {
+  return rawText
+    .replace(/"AI" redirects here.*?Artificial intelligence\./s, "")
+    .replace(/Jump to content.*?Newsquiz.*?\./s, "")
+    .replace(/\[\d+\]/g, "") 
+    .replace(/\s+/g, " ") 
+    .trim();
+}
 
 app.post("/summarize", async (req, res) => {
   let { text } = req.body;
@@ -18,7 +25,7 @@ app.post("/summarize", async (req, res) => {
     return res.status(400).json({ error: "No input text provided." });
   }
 
-  text = text.slice(0, 3000);
+  text = cleanText(text).slice(0, 3000); 
 
   const chunkSize = 1000;
   const chunks = [];
@@ -38,13 +45,14 @@ app.post("/summarize", async (req, res) => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
           },
-          body: JSON.stringify({ inputs: chunk }),
+          body: JSON.stringify({ inputs: `Summarize this article in 3-4 sentences: ${chunk}` }),
         }
       );
 
       const data = await response.json();
 
       if (!Array.isArray(data) || !data[0]?.summary_text) {
+        console.error("API error response:", data);
         return res.status(500).json({ error: JSON.stringify(data) });
       }
 
@@ -53,7 +61,6 @@ app.post("/summarize", async (req, res) => {
 
     const finalSummary = summaries.join(" ");
     res.json({ summary: finalSummary });
-
   } catch (err) {
     console.error("Summarization error:", err);
     res.status(500).json({ error: "Failed to generate summary." });
