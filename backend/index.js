@@ -13,32 +13,49 @@ app.use(express.json());
 
 app.post("/summarize", async (req, res) => {
   let { text } = req.body;
-  text = text.slice(0, 1000);
+
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: "No input text provided." });
+  }
+
+  text = text.slice(0, 3000);
+
+  const chunkSize = 1000;
+  const chunks = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.slice(i, i + chunkSize));
+  }
 
   try {
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`, 
-        },
-        body: JSON.stringify({ inputs: text }),
-      }
-    );
+    const summaries = [];
 
-    if (!response.ok) {
-      const error = await response.text();
-      return res.status(500).json({ error });
+    for (const chunk of chunks) {
+      const response = await fetch(
+        "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          },
+          body: JSON.stringify({ inputs: chunk }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!Array.isArray(data) || !data[0]?.summary_text) {
+        return res.status(500).json({ error: JSON.stringify(data) });
+      }
+
+      summaries.push(data[0].summary_text);
     }
 
-    const data = await response.json();
+    const finalSummary = summaries.join(" ");
+    res.json({ summary: finalSummary });
 
-    const summary = data[0]?.summary_text || "No summary generated.";
-    res.json({ summary });
   } catch (err) {
-    console.error(err);
+    console.error("Summarization error:", err);
     res.status(500).json({ error: "Failed to generate summary." });
   }
 });
