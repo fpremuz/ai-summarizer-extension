@@ -2,16 +2,17 @@
   "manifest_version": 3,
   "name": "AI Summarizer",
   "version": "1.0",
-  "description": "Summarize any article or YouTube video using AI.",
-  "permissions": ["activeTab", "scripting"],
+  "description": "Summarize the current page using AI.",
+  "permissions": ["scripting", "activeTab", "tabs"],
+  "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup.html",
-    "default_icon": "icon.png"
+    "default_popup": "popup.html"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
   ]
 }

@@ -1,37 +1,48 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
-import OpenAI from "openai";
+import fetch from "node-fetch"; 
+import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ path: './backend/.env' });
 
 const app = express();
+const PORT = 3000;
+
 app.use(cors());
 app.use(express.json());
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 app.post("/summarize", async (req, res) => {
+  let { text } = req.body;
+  text = text.slice(0, 1000);
+
   try {
-    const { text } = req.body;
-    const prompt = `Summarize this content in simple terms:\n\n${text}`;
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`, 
+        },
+        body: JSON.stringify({ inputs: text }),
+      }
+    );
 
-    const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "gpt-3.5-turbo",
-    });
+    if (!response.ok) {
+      const error = await response.text();
+      return res.status(500).json({ error });
+    }
 
-    const summary = chatCompletion.choices[0].message.content;
+    const data = await response.json();
+
+    const summary = data[0]?.summary_text || "No summary generated.";
     res.json({ summary });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Something went wrong" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to generate summary." });
   }
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Backend listening on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Summarizer</title>
-  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { font-family: sans-serif; padding: 10px; width: 300px; }
+    #result { margin-top: 10px; white-space: pre-wrap; }
+    #copy-btn { display: none; margin-top: 10px; }
+  </style>
 </head>
 <body>
-  <h1>AI Summary</h1>
-  <div id="result">Loading summary...</div>
-  <button onclick="copySummary()">Copy</button>
+  <meta charset="UTF-8" />
+  <h3>AI Summary</h3>
+  <div id="result">Loading...</div>
+  <button id="copy-btn">📋 Copy Summary</button>
   <script src="popup.js"></script>
 </body>
 </html>
