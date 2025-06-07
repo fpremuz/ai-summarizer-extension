@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Text Summarizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+  <header class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-800">AI Text Summarizer</h1>
+    <p class="text-gray-600 mt-1 max-w-xl text-center">
+      Paste your text and get a quick summary — powered by your backend API.
+    </p>
+  </header>
+
+  <main class="w-full max-w-3xl flex flex-col gap-4">
+    <textarea
+      id="inputText"
+      rows="10"
+      placeholder="Paste or type text here..."
+      class="w-full p-4 rounded-md border border-gray-300 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    ></textarea>
+
+    <button
+      id="summarizeBtn"
+      class="bg-indigo-600 text-white font-semibold py-3 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      Summarize
+    </button>
+
+    <div id="loading" class="hidden text-indigo-600 font-medium">Summarizing... Please wait.</div>
+
+    <section
+      id="resultSection"
+      class="hidden bg-white p-4 rounded-md border border-gray-300"
+    >
+      <h2 class="text-xl font-semibold mb-2">Summary</h2>
+      <p id="summaryText" class="whitespace-pre-wrap text-gray-800"></p>
+      <button
+        id="copyBtn"
+        class="mt-4 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md"
+      >
+        Copy Summary
+      </button>
+    </section>
+
+    <p id="errorMsg" class="text-red-600 font-semibold mt-2"></p>
+  </main>
+
+  <script src="index.js"></script>
+</body>
+</html>
