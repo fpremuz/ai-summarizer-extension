@@ -9,31 +9,30 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-function cleanText(rawText) {
-  return rawText
-    // Remove disambiguation or redirect notes
-    .replace(/"AI" redirects here.*?Artificial intelligence\./s, "")
-    // Remove Wikipedia-style sidebar content
-    .replace(/This article is part of a series.*?Artificial intelligence \(AI\)/s, "")
-    .replace(/Jump to content.*?Edit\s+/s, "")
-    // Remove NewsQuiz mentions
-    .replace(/The weekly News Quiz.*?\./s, "")
-    .replace(/Use the weekly Newsquiz.*?\./s, "")
-    // Remove [number] citations
-    .replace(/\[\d+\]/g, "")
-    // Remove unrelated bullet points or "Var:" mentions
-    .replace(/(Var:|Var\b).*?(\.|\n)/gi, "")
-    // Fix double words
-    .replace(/\b(\w+)\s+\1\b/gi, "$1")
-    // Remove non-standard characters
-    .replace(/[^a-zA-Z0-9\s.,;:'"\-()]/g, "")
-    // Collapse excess whitespace
-    .replace(/\s+/g, " ")
+// --- General cleaner (works for any text) ---
+function generalClean(text) {
+  return text
+    .replace(/\[\d+\]/g, "") // remove [1], [23] etc.
+    .replace(/\b(\w+)\s+\1\b/gi, "$1") // remove duplicated words
+    .replace(/[^a-zA-Z0-9\s.,;:'"\-()]/g, "") // remove non-standard characters
+    .replace(/\s+/g, " ") // collapse extra whitespace
+    .replace(/ \./g, ".") // fix space before periods
+    .replace(/"\s*([.,])/g, '$1') // remove quote before punctuation
+    .replace(/([a-z])\s+([A-Z])/g, (_, a, b) => `${a}. ${b}`) // insert missing periods
     .trim();
 }
 
-const cache = {};
+// --- Specific cleaner for Wikipedia AI article (optional) ---
+function cleanWikipediaAIArticle(text) {
+  return text
+    .replace(/"AI" redirects here.*?Artificial intelligence\./s, "")
+    .replace(/This article is part of a series.*?Artificial intelligence \(AI\)/s, "")
+    .replace(/Jump to content.*?Edit\s+/s, "")
+    .replace(/The weekly News Quiz.*?\./s, "")
+    .replace(/Use the weekly Newsquiz.*?\./s, "");
+}
 
+// --- Hugging Face API call with retry logic ---
 const fetchWithRetry = async (chunk, retries = 3) => {
   const endpoint = "https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6";
 
@@ -49,13 +48,11 @@ const fetchWithRetry = async (chunk, retries = 3) => {
       body: JSON.stringify({ inputs: chunk }),
     });
 
-    console.log("Response status:", response.status);
-    console.log("Response headers:", [...response.headers.entries()]);
-
     const raw = await response.text();
+    console.log("Response status:", response.status);
 
     if (response.status === 504 || response.status === 503) {
-      console.warn("⚠️ Hugging Face API timeout or unavailable. Retrying...");
+      console.warn("⚠️ API unavailable or timeout. Retrying...");
       await new Promise(res => setTimeout(res, 4000 * attempt));
       continue;
     }
@@ -63,14 +60,9 @@ const fetchWithRetry = async (chunk, retries = 3) => {
     try {
       const data = JSON.parse(raw);
 
-      if (data.error) {
-        console.warn("Model error:", data.error);
-        throw new Error(data.error);
-      }
-
-      if (!Array.isArray(data) || !data[0]?.summary_text) {
+      if (data.error) throw new Error(data.error);
+      if (!Array.isArray(data) || !data[0]?.summary_text)
         throw new Error("Invalid API response format");
-      }
 
       return data[0].summary_text;
     } catch (err) {
@@ -84,19 +76,29 @@ const fetchWithRetry = async (chunk, retries = 3) => {
   throw new Error("❌ All retries failed");
 };
 
+// --- Caching to avoid repeat summarizations ---
+const cache = {};
+
+// --- Main summarize route ---
 app.post("/summarize", async (req, res) => {
-  let { text } = req.body;
+  let { text, source } = req.body;
 
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: "No input text provided." });
   }
 
-  text = cleanText(text).slice(0, 5000);
+  // Optional source flag for better cleaning
+  if (source === "wikipedia_ai") {
+    text = cleanWikipediaAIArticle(text);
+  }
+
+  text = generalClean(text).slice(0, 5000);
 
   if (cache[text]) {
     return res.json({ summary: cache[text] });
   }
 
+  // Chunking text for summarization
   const chunkSize = 1300;
   const chunks = [];
   for (let i = 0; i < text.length; i += chunkSize) {
