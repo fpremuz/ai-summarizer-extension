@@ -11,13 +11,23 @@ app.use(express.json());
 
 function cleanText(rawText) {
   return rawText
+    // Remove disambiguation or redirect notes
     .replace(/"AI" redirects here.*?Artificial intelligence\./s, "")
+    // Remove Wikipedia-style sidebar content
     .replace(/This article is part of a series.*?Artificial intelligence \(AI\)/s, "")
-    .replace(/Jump to content.*?Newsquiz.*?\./s, "")
+    .replace(/Jump to content.*?Edit\s+/s, "")
+    // Remove NewsQuiz mentions
     .replace(/The weekly News Quiz.*?\./s, "")
+    .replace(/Use the weekly Newsquiz.*?\./s, "")
+    // Remove [number] citations
     .replace(/\[\d+\]/g, "")
+    // Remove unrelated bullet points or "Var:" mentions
     .replace(/(Var:|Var\b).*?(\.|\n)/gi, "")
+    // Fix double words
+    .replace(/\b(\w+)\s+\1\b/gi, "$1")
+    // Remove non-standard characters
     .replace(/[^a-zA-Z0-9\s.,;:'"\-()]/g, "")
+    // Collapse excess whitespace
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -87,7 +97,7 @@ app.post("/summarize", async (req, res) => {
     return res.json({ summary: cache[text] });
   }
 
-  const chunkSize = 1000;
+  const chunkSize = 1300;
   const chunks = [];
   for (let i = 0; i < text.length; i += chunkSize) {
     chunks.push(text.slice(i, i + chunkSize));
