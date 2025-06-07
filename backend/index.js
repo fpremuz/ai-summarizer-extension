@@ -79,6 +79,31 @@ const fetchWithRetry = async (chunk, retries = 3) => {
 // --- Caching to avoid repeat summarizations ---
 const cache = {};
 
+// --- Helper: Split text into overlapping chunks ---
+function splitIntoChunks(text, chunkSize = 1300, overlap = 200) {
+  const chunks = [];
+  let start = 0;
+
+  while (start < text.length) {
+    let end = start + chunkSize;
+    if (end > text.length) end = text.length;
+
+    chunks.push(text.slice(start, end));
+    start += chunkSize - overlap; // move start by chunkSize minus overlap
+  }
+
+  return chunks;
+}
+
+// --- Post-process final summary for cleaner output ---
+function postProcessSummary(summary) {
+  return summary
+    .replace(/\s+([.,;!?])/g, "$1")     // remove space before punctuation
+    .replace(/([.!?])([A-Za-z])/g, (m, p1, p2) => p1 + " " + p2) // ensure space after punctuation
+    .replace(/\s+/g, " ")               // normalize whitespace
+    .trim();
+}
+
 // --- Main summarize route ---
 app.post("/summarize", async (req, res) => {
   let { text, source } = req.body;
@@ -98,12 +123,7 @@ app.post("/summarize", async (req, res) => {
     return res.json({ summary: cache[text] });
   }
 
-  // Chunking text for summarization
-  const chunkSize = 1300;
-  const chunks = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.slice(i, i + chunkSize));
-  }
+  const chunks = splitIntoChunks(text);
 
   try {
     const summaries = [];
@@ -114,7 +134,9 @@ app.post("/summarize", async (req, res) => {
       summaries.push(summary);
     }
 
-    const finalSummary = summaries.join(" ");
+    let finalSummary = summaries.join(" ");
+    finalSummary = postProcessSummary(finalSummary);
+
     cache[text] = finalSummary;
 
     res.json({ summary: finalSummary });
