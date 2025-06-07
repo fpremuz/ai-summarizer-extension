@@ -12,11 +12,67 @@ app.use(express.json());
 function cleanText(rawText) {
   return rawText
     .replace(/"AI" redirects here.*?Artificial intelligence\./s, "")
+    .replace(/This article is part of a series.*?Artificial intelligence \(AI\)/s, "")
     .replace(/Jump to content.*?Newsquiz.*?\./s, "")
-    .replace(/\[\d+\]/g, "") 
-    .replace(/\s+/g, " ") 
+    .replace(/The weekly News Quiz.*?\./s, "")
+    .replace(/\[\d+\]/g, "")
+    .replace(/(Var:|Var\b).*?(\.|\n)/gi, "")
+    .replace(/[^a-zA-Z0-9\s.,;:'"\-()]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
+
+const cache = {};
+
+const fetchWithRetry = async (chunk, retries = 3) => {
+  const endpoint = "https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6";
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    console.log(`➡️ Attempt ${attempt} to summarize chunk...`);
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+      },
+      body: JSON.stringify({ inputs: chunk }),
+    });
+
+    console.log("Response status:", response.status);
+    console.log("Response headers:", [...response.headers.entries()]);
+
+    const raw = await response.text();
+
+    if (response.status === 504 || response.status === 503) {
+      console.warn("⚠️ Hugging Face API timeout or unavailable. Retrying...");
+      await new Promise(res => setTimeout(res, 4000 * attempt));
+      continue;
+    }
+
+    try {
+      const data = JSON.parse(raw);
+
+      if (data.error) {
+        console.warn("Model error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (!Array.isArray(data) || !data[0]?.summary_text) {
+        throw new Error("Invalid API response format");
+      }
+
+      return data[0].summary_text;
+    } catch (err) {
+      if (attempt === retries) {
+        throw new Error(`❌ Failed after ${retries} retries: ${err.message}`);
+      }
+      console.warn("⚠️ Parse error or API issue:", err.message);
+    }
+  }
+
+  throw new Error("❌ All retries failed");
+};
 
 app.post("/summarize", async (req, res) => {
   let { text } = req.body;
@@ -25,7 +81,11 @@ app.post("/summarize", async (req, res) => {
     return res.status(400).json({ error: "No input text provided." });
   }
 
-  text = cleanText(text).slice(0, 3000); 
+  text = cleanText(text).slice(0, 5000);
+
+  if (cache[text]) {
+    return res.json({ summary: cache[text] });
+  }
 
   const chunkSize = 1000;
   const chunks = [];
@@ -37,36 +97,21 @@ app.post("/summarize", async (req, res) => {
     const summaries = [];
 
     for (const chunk of chunks) {
-      const response = await fetch(
-        "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          },
-          body: JSON.stringify({ inputs: `Summarize this article in 3-4 sentences: ${chunk}` }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!Array.isArray(data) || !data[0]?.summary_text) {
-        console.error("API error response:", data);
-        return res.status(500).json({ error: JSON.stringify(data) });
-      }
-
-      summaries.push(data[0].summary_text);
+      console.log("📤 Sending chunk:", chunk.slice(0, 100) + "...");
+      const summary = await fetchWithRetry(chunk);
+      summaries.push(summary);
     }
 
     const finalSummary = summaries.join(" ");
+    cache[text] = finalSummary;
+
     res.json({ summary: finalSummary });
   } catch (err) {
-    console.error("Summarization error:", err);
-    res.status(500).json({ error: "Failed to generate summary." });
+    console.error("❌ Summarization error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
