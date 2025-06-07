@@ -1,60 +1,45 @@
-const inputText = document.getElementById("inputText");
-const summarizeBtn = document.getElementById("summarizeBtn");
-const loadingIndicator = document.getElementById("loading");
-const resultSection = document.getElementById("resultSection");
-const summaryText = document.getElementById("summaryText");
-const copyBtn = document.getElementById("copyBtn");
-const errorMsg = document.getElementById("errorMsg");
+const copyBtn = document.getElementById('copyBtn');
+const outputDiv = document.getElementById('output');
 
-summarizeBtn.addEventListener("click", async () => {
-  errorMsg.textContent = "";
-  const text = inputText.value.trim();
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(outputDiv.innerText)
+    .then(() => {
+      copyBtn.innerText = 'Copied!';
+      setTimeout(() => copyBtn.innerText = 'Copy Summary', 2000);
+    })
+    .catch(() => alert('Failed to copy'));
+});
 
-  if (!text) {
-    errorMsg.textContent = "Please enter some text to summarize.";
+document.getElementById('summarizeBtn').addEventListener('click', async () => {
+  const inputText = document.getElementById('inputText').value.trim();
+  const loadingDiv = document.getElementById('loading');
+
+  if (!inputText) {
+    alert('Please enter some text to summarize.');
     return;
   }
 
-  summarizeBtn.disabled = true;
-  loadingIndicator.classList.remove("hidden");
-  resultSection.classList.add("hidden");
-  summaryText.textContent = "";
+  outputDiv.classList.add('hidden');
+  copyBtn.classList.add('hidden');
+  loadingDiv.classList.remove('hidden');
 
   try {
-    const response = await fetch("http://localhost:3000/summarize", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ text })
+    const response = await fetch('http://localhost:3000/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: inputText }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status} ${response.statusText}`);
-    }
 
     const data = await response.json();
 
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    summaryText.textContent = data.summary;
-    resultSection.classList.remove("hidden");
-
+    outputDiv.innerText = data.summary || 'No summary returned.';
+    outputDiv.classList.remove('hidden');
+    copyBtn.classList.remove('hidden');
   } catch (error) {
-    errorMsg.textContent = `❌ Error: ${error.message}`;
-  } finally {
-    loadingIndicator.classList.add("hidden");
-    summarizeBtn.disabled = false;
+    outputDiv.innerText = 'An error occurred. Please try again.';
+    outputDiv.classList.remove('hidden');
+    console.error(error);
   }
-});
 
-copyBtn.addEventListener("click", () => {
-  if (!summaryText.textContent) return;
-
-  navigator.clipboard.writeText(summaryText.textContent).then(() => {
-    copyBtn.textContent = "Copied!";
-    setTimeout(() => (copyBtn.textContent = "Copy Summary"), 1500);
-  });
+  loadingDiv.classList.add('hidden');
 });
