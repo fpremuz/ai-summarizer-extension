@@ -34,7 +34,7 @@ function cleanWikipediaAIArticle(text) {
 
 // --- Hugging Face API call with retry logic ---
 const fetchWithRetry = async (chunk, retries = 3) => {
-  const endpoint = "https://api-inference.huggingface.co/models/sshleifer/distilbart-cnn-12-6";
+  const endpoint = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     console.log(`➡️ Attempt ${attempt} to summarize chunk...`);

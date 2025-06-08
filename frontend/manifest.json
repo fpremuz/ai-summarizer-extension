@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "AI Article Summarizer",
+  "version": "1.0",
+  "description": "Summarize any selected article using AI.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "host_permissions": ["<all_urls>"]
+}
