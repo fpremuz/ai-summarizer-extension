@@ -23,23 +23,27 @@ document.getElementById('summarizeBtn').addEventListener('click', async () => {
   copyBtn.classList.add('hidden');
   loadingDiv.classList.remove('hidden');
 
-  try {
+   try {
     const response = await fetch('https://ai-summarizer-extension.onrender.com/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: inputText }),
     });
 
-    const data = await response.json();
+    const text = await response.text(); 
+    console.log('Response status:', response.status);
+    console.log('Response text:', text);
 
+    if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+    const data = JSON.parse(text); 
     outputDiv.innerText = data.summary || 'No summary returned.';
-    outputDiv.classList.remove('hidden');
-    copyBtn.classList.remove('hidden');
   } catch (error) {
     outputDiv.innerText = 'An error occurred. Please try again.';
-    outputDiv.classList.remove('hidden');
-    console.error(error);
+    console.error('Summary error:', error);
   }
 
+  outputDiv.classList.remove('hidden');
+  copyBtn.classList.remove('hidden');
   loadingDiv.classList.add('hidden');
 });
