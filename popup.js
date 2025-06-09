@@ -1,6 +1,9 @@
 const resultDiv = document.getElementById("result");
 const copyButton = document.getElementById("copy-btn");
 
+let loadingInterval;
+let delayHintTimeout; // <-- added this
+
 async function getCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
@@ -48,11 +51,25 @@ async function summarize() {
     }
 
     resultDiv.textContent = "🤖 Summarizing with AI...";
+    showLoadingAnimation();
+
+    // 🕒 Set a fallback message if it takes too long
+    delayHintTimeout = setTimeout(() => {
+      if (resultDiv.textContent.startsWith("🤖 Summarizing")) {
+        resultDiv.textContent = "🕒 Still summarizing... This can take up to 30s the first time.";
+      }
+    }, 15000);
+
     const summary = await summarizeWithBackend(text);
+
+    clearTimeout(delayHintTimeout); // 🧹 Cancel timeout if done early
+    stopLoadingAnimation();
 
     resultDiv.textContent = summary;
     copyButton.style.display = "block";
   } catch (err) {
+    clearTimeout(delayHintTimeout); // 🧹 Cancel on error too
+    stopLoadingAnimation();
     console.error(err);
     resultDiv.textContent = "❌ Error: " + err.message;
   }
@@ -68,3 +85,15 @@ document.addEventListener("DOMContentLoaded", () => {
   summarize();
   copyButton.addEventListener("click", copySummary);
 });
+
+function showLoadingAnimation() {
+  let dots = 1;
+  loadingInterval = setInterval(() => {
+    resultDiv.textContent = "🤖 Summarizing" + ".".repeat(dots);
+    dots = (dots % 3) + 1;
+  }, 500);
+}
+
+function stopLoadingAnimation() {
+  clearInterval(loadingInterval);
+}
