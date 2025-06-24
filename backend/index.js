@@ -117,7 +117,7 @@ app.post("/summarize", async (req, res) => {
     text = cleanWikipediaAIArticle(text);
   }
 
-  text = generalClean(text).slice(0, 5000);
+  text = generalClean(text);
 
   if (cache[text]) {
     return res.json({ summary: cache[text] });

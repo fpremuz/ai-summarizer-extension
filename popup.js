@@ -59,12 +59,16 @@ async function summarizeCurrentPage() {
       }
     }, 15000);
 
-    const summary = await summarizeWithBackend(text);
-
+    const summaryResult = await summarizeWithBackend(text);
     clearTimeout(delayHintTimeout);
     stopLoadingAnimation();
 
-    resultDiv.textContent = summary;
+    resultDiv.textContent = summaryResult.summary;
+
+    if (summaryResult.wasTrimmed) {
+      resultDiv.textContent += "\n\n⚠️ Note: Long content was trimmed for free summarization.";
+    }
+
     copyButton.style.display = "inline-block";
   } catch (err) {
     clearTimeout(delayHintTimeout);
@@ -82,7 +86,11 @@ function copySummary() {
 
 async function summarizeWithBackend(text) {
   const MAX_LENGTH = 4000;
+  const wasTrimmed = text.length > MAX_LENGTH;
   const trimmedText = text.slice(0, MAX_LENGTH);
+  const tokenCount = Math.round(trimmedText.length / 4);
+  console.log(`🧠 Estimated tokens: ${tokenCount}`);
+  resultDiv.textContent += `\n🧮 Estimated input tokens: ${tokenCount}`;
 
   const response = await fetch("https://ai-summarizer-extension.onrender.com/summarize", {
     method: "POST",
@@ -97,15 +105,20 @@ async function summarizeWithBackend(text) {
     data = await response.json();
   } catch (err) {
     const fallbackText = await response.text();
-    console.error("🧨 Server returned non-JSON:", fallbackText);
     throw new Error("Server error: " + (fallbackText.includes("Payload Too Large")
       ? "Content is too long to summarize."
       : "Unexpected server response."));
   }
 
   if (!response.ok) {
-    throw new Error("Server error: " + (data?.error || "Something went wrong"));
+    const fallback = await response.text();
+    throw new Error("Server error: " + (fallback.includes("Payload Too Large")
+      ? "Input too long. Try summarizing a shorter page."
+      : fallback));
   }
 
-  return data.summary || "No summary generated.";
+  return {
+    summary: data.summary || "No summary generated.",
+    wasTrimmed
+  };
 }

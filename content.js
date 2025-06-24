@@ -1,18 +1,25 @@
 console.log("📄 content.js loaded");
 
+// Try to open YouTube transcript if it's a video page
+if (
+  window.location.hostname.includes("youtube.com") &&
+  window.location.pathname.startsWith("/watch")
+) {
+  setTimeout(tryToOpenTranscriptPanel, 1000);
+}
+
 function cleanTranscript(text) {
   return text
-    .replace(/\[\d{1,2}:\d{2}(?::\d{2})?]/g, "") // Remove [00:01]
-    .replace(/^.*?:\s*/gm, "")                  // Remove speaker names
+    .replace(/\[\d{1,2}:\d{2}(?::\d{2})?]/g, "")
+    .replace(/^.*?:\s*/gm, "")
     .replace(/\s{2,}/g, " ")
     .replace(/\n{2,}/g, "\n")
     .trim();
 }
 
 function getYouTubeTranscriptFromDOM() {
-  const lines = document.querySelectorAll(
-    "ytd-transcript-segment-renderer yt-formatted-string"
-  );
+  tryToOpenTranscriptPanel();
+  const lines = document.querySelectorAll("ytd-transcript-segment-renderer yt-formatted-string");
 
   if (!lines || lines.length === 0) {
     console.warn("❌ Transcript lines not found in DOM");
@@ -43,6 +50,22 @@ function getMainArticleText() {
 
   console.warn("No article-like content found.");
   return null;
+}
+
+function tryToOpenTranscriptPanel() {
+  const menuButton = document.querySelector('button[aria-label*="More actions"]');
+  if (!menuButton) return false;
+
+  menuButton.click();
+
+  setTimeout(() => {
+    const transcriptItem = Array.from(document.querySelectorAll("ytd-menu-service-item-renderer"))
+      .find(el => el.innerText.toLowerCase().includes("transcript"));
+
+    if (transcriptItem) {
+      transcriptItem.click();
+    }
+  }, 500);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
