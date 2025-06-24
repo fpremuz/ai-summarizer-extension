@@ -1,12 +1,20 @@
 {
   "name": "AI Summarizer",
-  "version": "1.0",
+  "version": "1.1",
   "manifest_version": 3,
-  "description": "Summarize the current page using AI.",
-  "permissions": ["scripting", "activeTab", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "description": "Summarize the current page or YouTube video using AI.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_title": "AI Summarizer"
   },
   "content_scripts": [
     {
@@ -14,5 +22,10 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
 }
