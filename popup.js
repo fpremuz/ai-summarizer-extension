@@ -2,6 +2,46 @@ console.log("🔋 popup.js loaded!");
 
 const resultDiv = document.getElementById("result");
 const copyButton = document.getElementById("copy-btn");
+const loading = document.getElementById("loading");
+const result = document.getElementById("result");
+const summary = document.getElementById("summary");
+const error = document.getElementById("error");
+const title = document.getElementById("video-title");
+const upgradeNote = document.getElementById("upgrade-note");
+
+function showLoading() {
+  loading.style.display = "block";
+  result.style.display = "none";
+  error.style.display = "none";
+}
+
+function showResult(text, tabTitle) {
+  loading.style.display = "none";
+  result.style.display = "block";
+  error.style.display = "none";
+  summary.textContent = text;
+  title.textContent = tabTitle || "Summary";
+  
+  // Show upgrade note if long summary trimmed
+  if (text.length > 1000) {
+    upgradeNote.textContent = "⚠️ This is a shortened summary. Get full summary with Premium.";
+  } else {
+    upgradeNote.textContent = "";
+  }
+}
+
+function showError(msg) {
+  loading.style.display = "none";
+  result.style.display = "none";
+  error.style.display = "block";
+  error.textContent = `❌ Error: ${msg}`;
+}
+
+document.getElementById("copy-btn").addEventListener("click", () => {
+  navigator.clipboard.writeText(summary.textContent)
+    .then(() => alert("Copied to clipboard!"))
+    .catch(() => alert("Failed to copy."));
+});
 
 let loadingInterval;
 let delayHintTimeout;

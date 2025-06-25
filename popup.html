@@ -14,5 +14,15 @@
   <button id="copy-btn">📋 Copy Summary</button>
   <script src="popup.js"></script>
   <div id="spinner" style="display: none;">⏳</div>
+  <div id="loading" style="display: none;">⏳ Summarizing...</div>
+
+  <div id="result" style="display: none;">
+    <h2 id="video-title"></h2>
+    <pre id="summary" style="white-space: pre-wrap;"></pre>
+    <button id="copy-btn">📋 Copy</button>
+    <p id="upgrade-note" style="color: orange; font-size: 0.9em;"></p>
+  </div>
+
+  <div id="error" style="display: none; color: red;"></div>
 </body>
 </html>
