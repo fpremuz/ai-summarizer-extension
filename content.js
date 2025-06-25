@@ -2,8 +2,10 @@ console.log("📄 content.js loaded");
 
 function cleanTranscript(text) {
   return text
-    .replace(/\[\d{1,2}:\d{2}(?::\d{2})?]/g, "")
-    .replace(/^.*?:\s*/gm, "")
+    .replace(/\[\d{1,2}:\d{2}(?::\d{2})?]/g, "") 
+    .replace(/^.*?:\s*/gm, "") 
+    .replace(/(\.\s+)?Ineed/gi, ". I need") 
+    .replace(/(sponsored by|brought to you by).+?\./gi, "") 
     .replace(/\s{2,}/g, " ")
     .replace(/\n{2,}/g, "\n")
     .trim();
