@@ -1,13 +1,5 @@
 console.log("📄 content.js loaded");
 
-// Try to open YouTube transcript if it's a video page
-if (
-  window.location.hostname.includes("youtube.com") &&
-  window.location.pathname.startsWith("/watch")
-) {
-  setTimeout(tryToOpenTranscriptPanel, 1000);
-}
-
 function cleanTranscript(text) {
   return text
     .replace(/\[\d{1,2}:\d{2}(?::\d{2})?]/g, "")
@@ -17,29 +9,59 @@ function cleanTranscript(text) {
     .trim();
 }
 
-function getYouTubeTranscriptFromDOM() {
-  tryToOpenTranscriptPanel();
-  const lines = document.querySelectorAll("ytd-transcript-segment-renderer yt-formatted-string");
+function sleep(ms) {
+  return new Promise((res) => setTimeout(res, ms));
+}
 
-  if (!lines || lines.length === 0) {
-    console.warn("❌ Transcript lines not found in DOM");
-    return null;
+async function openTranscriptPanel() {
+  console.log("🧪 Trying to open transcript panel from description...");
+
+  const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    const transcriptButton = Array.from(document.querySelectorAll("tp-yt-paper-button, button, yt-formatted-string"))
+      .find((el) =>
+        el.innerText?.toLowerCase().includes("transcrip") ||  // "Transcript" (English)
+        el.innerText?.toLowerCase().includes("transcripción") || // "Transcripción" (Spanish)
+        el.innerText?.toLowerCase().includes("transcripcion") // Without accent
+      );
+
+    if (transcriptButton) {
+      transcriptButton.scrollIntoView({ behavior: "smooth" });
+      transcriptButton.click();
+      console.log("✅ Clicked transcript button in description");
+      await wait(1500);
+      return true;
+    }
+
+    console.log(`⏳ Transcript button not found... attempt ${attempt}`);
+    await wait(1000);
   }
 
-  const transcript = Array.from(lines)
-    .map((el) => el.textContent.trim())
-    .filter(Boolean)
-    .join(" ");
+  console.warn("❌ Transcript button not found in description");
+  return false;
+}
 
-  return cleanTranscript(transcript);
+async function getTranscriptTextFromDOM(retries = 30, delay = 500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const lines = document.querySelectorAll("ytd-transcript-segment-renderer");
+    if (lines.length > 0) {
+      console.log(`✅ Found ${lines.length} transcript lines`);
+      return Array.from(lines)
+        .map(el => el.innerText.trim())
+        .filter(Boolean)
+        .join("\n\n");
+    }
+
+    console.log(`🔁 Waiting for transcript lines... attempt ${attempt}`);
+    await sleep(delay);
+  }
+
+  console.warn("❌ Transcript content not found in time");
+  return null;
 }
 
 function getMainArticleText() {
-  if (window.location.hostname.includes("wikipedia.org")) {
-    const el = document.querySelector("#mw-content-text");
-    if (el) return el.innerText.trim();
-  }
-
   const articleTags = document.querySelectorAll("article, main, body");
   for (const tag of articleTags) {
     const text = tag.innerText;
@@ -52,42 +74,35 @@ function getMainArticleText() {
   return null;
 }
 
-function tryToOpenTranscriptPanel() {
-  const menuButton = document.querySelector('button[aria-label*="More actions"]');
-  if (!menuButton) return false;
-
-  menuButton.click();
-
-  setTimeout(() => {
-    const transcriptItem = Array.from(document.querySelectorAll("ytd-menu-service-item-renderer"))
-      .find(el => el.innerText.toLowerCase().includes("transcript"));
-
-    if (transcriptItem) {
-      transcriptItem.click();
-    }
-  }, 500);
-}
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getPageText") {
-    if (
-      window.location.hostname.includes("youtube.com") &&
-      window.location.pathname.startsWith("/watch")
-    ) {
-      const transcript = getYouTubeTranscriptFromDOM();
-      if (transcript) {
-        sendResponse({ text: transcript });
+    (async () => {
+      if (
+        window.location.hostname.includes("youtube.com") &&
+        window.location.pathname.startsWith("/watch")
+      ) {
+        const opened = await openTranscriptPanel();
+        if (!opened) {
+          sendResponse({ error: "Transcript panel could not be opened automatically." });
+          return;
+        }
+
+        const transcript = await getTranscriptTextFromDOM();
+        if (transcript && transcript.length > 50) {
+          sendResponse({ text: cleanTranscript(transcript) });
+        } else {
+          sendResponse({ error: "Transcript not found in DOM." });
+        }
       } else {
-        sendResponse({ error: "Transcript not found in DOM. Please open transcript panel on YouTube first." });
+        const text = getMainArticleText();
+        if (text) {
+          sendResponse({ text });
+        } else {
+          sendResponse({ error: "Could not extract article content." });
+        }
       }
-    } else {
-      const text = getMainArticleText();
-      if (text) {
-        sendResponse({ text });
-      } else {
-        sendResponse({ error: "Could not extract article content." });
-      }
-    }
-    return true;
+    })();
+
+    return true; // keep the message channel open for async response
   }
 });
